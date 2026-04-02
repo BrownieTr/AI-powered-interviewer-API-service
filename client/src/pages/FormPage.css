@@ -1,0 +1,58 @@
+.form-page {
+  max-width: 22rem;
+  margin: 2rem auto;
+}
+
+.form-page h1 {
+  font-size: 1.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.form-page-lead {
+  color: var(--muted);
+  margin: 0 0 1.5rem;
+  font-size: 0.95rem;
+}
+
+.form-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.form-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.form-card input {
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.form-error {
+  color: #f87171;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.form-footer {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.form-footer a {
+  color: var(--accent);
+}
