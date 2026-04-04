@@ -1,9 +1,14 @@
+import "dotenv/config";
 import { z } from "zod";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).optional(),
   PORT: z.coerce.number().positive().optional(),
-  CLIENT_ORIGIN: z.string().url().optional(),
+  CLIENT_ORIGIN: z
+    .string()
+    .url()
+    .transform((origin) => origin.replace(/\/+$/, ""))
+    .optional(),
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   JWT_EXPIRES_IN: z.string().default("7d"),
   /** Hugging Face access token: https://huggingface.co/settings/tokens */
