@@ -73,6 +73,27 @@ export async function getDb(config: Config): Promise<Pool> {
     );
   }
 
+  if (config.DATABASE_URL) {
+    const raw = config.DATABASE_URL;
+    if (raw.includes("show-password")) {
+      throw new Error(
+        "DATABASE_URL still contains the 'show-password' placeholder. Use the real database password from DigitalOcean."
+      );
+    }
+
+    try {
+      const parsed = new URL(raw);
+      if (parsed.hostname === "base") {
+        throw new Error(
+          "DATABASE_URL resolves to host 'base', which is invalid. In App Platform, remove conflicting PGHOST/PG* vars and set DATABASE_URL to the full DigitalOcean Postgres URL."
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid DATABASE_URL";
+      throw new Error(`Invalid DATABASE_URL: ${message}`);
+    }
+  }
+
   const commonPoolOptions = {
     ssl: resolveSsl(config),
     max: config.DATABASE_POOL_MAX,
