@@ -8,6 +8,7 @@ import { createInferenceClient } from "./services/hfInference.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { createUsersRouter } from "./routes/users.js";
 import { createPhoneRouter } from "./routes/phone.js";
+import { createTwilioVoiceRouter } from "./routes/twilioVoice.js";
 
 const config = loadConfig();
 const db = getDb(config);
@@ -33,6 +34,7 @@ app.use(
 );
 
 app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: false }));
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -63,6 +65,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/auth", authLimiter, createAuthRouter(db, config));
 app.use("/api/users", createUsersRouter(db, config));
 app.use("/api/phone", createPhoneRouter(db, hf, config));
+app.use("/api/twilio/voice", createTwilioVoiceRouter(db, hf, config));
 
 app.use(
   (
@@ -73,8 +76,13 @@ app.use(
   ) => {
     console.error(err);
     const message = err instanceof Error ? err.message : "Server error";
+    const isTooLargeUpload =
+      err && typeof err === "object" && "code" in err && (err as { code?: string }).code === "LIMIT_FILE_SIZE";
+
     const status =
-      err && typeof err === "object" && "status" in err && typeof (err as { status?: number }).status === "number"
+      isTooLargeUpload
+        ? 413
+        : err && typeof err === "object" && "status" in err && typeof (err as { status?: number }).status === "number"
         ? (err as { status: number }).status
         : message.includes("Inference") ||
             message.includes("inference") ||
@@ -84,6 +92,10 @@ app.use(
           : 500;
     if (config.NODE_ENV !== "production" && err instanceof Error) {
       res.status(status).json({ error: message, stack: err.stack });
+      return;
+    }
+    if (isTooLargeUpload) {
+      res.status(status).json({ error: "Uploaded file is too large. Maximum allowed size is 5 MB." });
       return;
     }
     res.status(status).json({ error: status === 500 ? "Internal server error" : message });

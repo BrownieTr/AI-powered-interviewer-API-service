@@ -41,8 +41,22 @@ export function getDb(config: Config): Database.Database {
       FOREIGN KEY (interview_id) REFERENCES interviews(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS call_sessions (
+      call_sid TEXT PRIMARY KEY,
+      interview_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      from_number TEXT,
+      to_number TEXT,
+      call_status TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (interview_id) REFERENCES interviews(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_interviews_user ON interviews(user_id);
     CREATE INDEX IF NOT EXISTS idx_messages_interview ON messages(interview_id);
+    CREATE INDEX IF NOT EXISTS idx_call_sessions_interview ON call_sessions(interview_id);
   `);
   db = instance;
   return instance;
