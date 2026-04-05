@@ -36,6 +36,25 @@
   line-height: 1.45;
 }
 
+.interview-form input[type="tel"] {
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.interview-form input[type="file"] {
+  color: var(--text);
+}
+
+.file-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
 .page-error {
   color: #f87171;
 }

@@ -27,9 +27,18 @@ type FetchOpts = Omit<RequestInit, "body"> & { body?: unknown };
 
 export async function api<T>(path: string, opts: FetchOpts = {}): Promise<T> {
   const token = getToken();
+  const isFormData = opts.body instanceof FormData;
+  const requestBody: BodyInit | null | undefined =
+    opts.body === undefined
+      ? undefined
+      : opts.body === null
+        ? null
+      : isFormData
+        ? (opts.body as FormData)
+        : JSON.stringify(opts.body);
   const headers: Record<string, string> = {
     Accept: "application/json",
-    ...(opts.body !== undefined ? { "Content-Type": "application/json" } : {}),
+    ...(opts.body !== undefined && !isFormData ? { "Content-Type": "application/json" } : {}),
     ...(opts.headers as Record<string, string> | undefined),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
@@ -37,7 +46,7 @@ export async function api<T>(path: string, opts: FetchOpts = {}): Promise<T> {
   const res = await fetch(`${apiBase}${path}`, {
     ...opts,
     headers,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    body: requestBody,
   });
 
   const text = await res.text();
