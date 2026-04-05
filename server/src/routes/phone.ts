@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { z } from "zod";
-import type Database from "better-sqlite3";
+import type { Pool } from "pg";
 import type { InferenceClient } from "@huggingface/inference";
 import type { Config } from "../config.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -39,7 +39,7 @@ const upload = multer({
   },
 });
 
-export function createPhoneRouter(db: Database.Database, hf: InferenceClient, config: Config) {
+export function createPhoneRouter(db: Pool, hf: InferenceClient, config: Config) {
   const r = Router();
   const auth = requireAuth(config);
   r.use(auth);
@@ -47,7 +47,7 @@ export function createPhoneRouter(db: Database.Database, hf: InferenceClient, co
   r.get(
     "/sessions",
     asyncHandler(async (req, res) => {
-      const rows = listSessions(db, req.auth!.sub);
+      const rows = await listSessions(db, req.auth!.sub);
       res.json({
         sessions: rows.map((s) => ({
           id: s.id,
@@ -109,7 +109,7 @@ export function createPhoneRouter(db: Database.Database, hf: InferenceClient, co
           publicBaseUrl,
         });
 
-        bindCallToInterview(db, {
+        await bindCallToInterview(db, {
           callSid: dial.callSid,
           interviewId: out.sessionId,
           userId: req.auth!.sub,
@@ -130,7 +130,7 @@ export function createPhoneRouter(db: Database.Database, hf: InferenceClient, co
   r.get(
     "/sessions/:sessionId",
     asyncHandler(async (req, res) => {
-      const detail = getSessionDetail(db, req.auth!.sub, req.params.sessionId);
+      const detail = await getSessionDetail(db, req.auth!.sub, req.params.sessionId);
       if (!detail) {
         res.status(404).json({ error: "Session not found" });
         return;
