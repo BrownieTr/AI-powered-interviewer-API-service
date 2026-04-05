@@ -17,7 +17,15 @@ const envSchema = z.object({
   HF_MODEL: z.string().default("Qwen/Qwen2.5-1.5B-Instruct"),
   /** Inference provider id, or "auto" (omit) to use HF router defaults */
   HF_PROVIDER: z.string().optional(),
-  DATABASE_URL: z.string().url().optional(),
+  DATABASE_URL: z
+    .string()
+    .optional()
+    .transform((value) => {
+      if (!value) return value;
+      const trimmed = value.trim();
+      // App platform values may be pasted with wrapping quotes.
+      return trimmed.replace(/^['\"]|['\"]$/g, "");
+    }),
   DATABASE_SSL: z
     .string()
     .optional()
