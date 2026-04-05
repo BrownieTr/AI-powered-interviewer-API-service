@@ -16,6 +16,13 @@ dist-ssr
 # Environment files (keep templates)
 .env
 .env.*
+!.env.example
+
+# Runtime SQLite database files
+data/
+*.db
+*.db-wal
+*.db-shm
 
 # Editor directories and files
 .vscode/*
