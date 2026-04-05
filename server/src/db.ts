@@ -17,6 +17,22 @@ function hasDiscretePgConfig(config: Config): boolean {
   return Boolean(config.PGHOST && config.PGPORT && config.PGDATABASE && config.PGUSER);
 }
 
+function normalizeConnectionString(raw: string): string {
+  try {
+    const url = new URL(raw);
+    // Prefer explicit ssl settings from env/config over sslmode query semantics in the URL.
+    url.searchParams.delete("sslmode");
+    url.searchParams.delete("uselibpqcompat");
+    url.searchParams.delete("sslcert");
+    url.searchParams.delete("sslkey");
+    url.searchParams.delete("sslrootcert");
+    url.searchParams.delete("sslcrl");
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
 async function initSchema(client: PoolClient) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -89,9 +105,13 @@ export async function getDb(config: Config): Promise<Pool> {
     connectionTimeoutMillis: config.DATABASE_CONNECTION_TIMEOUT_MS,
   };
 
-  const instance = config.DATABASE_URL
+  const normalizedConnectionString = config.DATABASE_URL
+    ? normalizeConnectionString(config.DATABASE_URL)
+    : undefined;
+
+  const instance = normalizedConnectionString
     ? new Pool({
-        connectionString: config.DATABASE_URL,
+        connectionString: normalizedConnectionString,
         ...commonPoolOptions,
       })
     : new Pool({
