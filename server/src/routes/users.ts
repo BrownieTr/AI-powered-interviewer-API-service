@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import type Database from "better-sqlite3";
+import type { Pool } from "pg";
 import type { Config } from "../config.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
@@ -11,7 +11,7 @@ const passwordSchema = z.object({
   newPassword: z.string().min(8).max(128),
 });
 
-export function createUsersRouter(db: Database.Database, config: Config) {
+export function createUsersRouter(db: Pool, config: Config) {
   const r = Router();
   const auth = requireAuth(config);
 
@@ -21,9 +21,11 @@ export function createUsersRouter(db: Database.Database, config: Config) {
     "/me",
     asyncHandler(async (req, res) => {
       const userId = req.auth!.sub;
-      const row = db
-        .prepare(`SELECT id, email, created_at FROM users WHERE id = ?`)
-        .get(userId) as { id: string; email: string; created_at: number } | undefined;
+      const rowQuery = await db.query<{ id: string; email: string; created_at: number }>(
+        `SELECT id, email, created_at FROM users WHERE id = $1 LIMIT 1`,
+        [userId]
+      );
+      const row = rowQuery.rows[0];
       if (!row) {
         res.status(404).json({ error: "User not found" });
         return;
@@ -45,9 +47,11 @@ export function createUsersRouter(db: Database.Database, config: Config) {
         return;
       }
       const userId = req.auth!.sub;
-      const user = db
-        .prepare(`SELECT password_hash FROM users WHERE id = ?`)
-        .get(userId) as { password_hash: string } | undefined;
+      const userQuery = await db.query<{ password_hash: string }>(
+        `SELECT password_hash FROM users WHERE id = $1 LIMIT 1`,
+        [userId]
+      );
+      const user = userQuery.rows[0];
       if (!user) {
         res.status(404).json({ error: "User not found" });
         return;
@@ -58,7 +62,7 @@ export function createUsersRouter(db: Database.Database, config: Config) {
         return;
       }
       const nextHash = await bcrypt.hash(parsed.data.newPassword, 12);
-      db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).run(nextHash, userId);
+      await db.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [nextHash, userId]);
       res.json({ ok: true });
     })
   );

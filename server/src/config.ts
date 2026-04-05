@@ -17,7 +17,23 @@ const envSchema = z.object({
   HF_MODEL: z.string().default("Qwen/Qwen2.5-1.5B-Instruct"),
   /** Inference provider id, or "auto" (omit) to use HF router defaults */
   HF_PROVIDER: z.string().optional(),
-  DATABASE_PATH: z.string().default("./data/app.db"),
+  DATABASE_URL: z.string().url().optional(),
+  DATABASE_SSL: z
+    .string()
+    .optional()
+    .transform((value) => value === "true" || value === "1"),
+  DATABASE_SSL_REJECT_UNAUTHORIZED: z
+    .string()
+    .optional()
+    .transform((value) => value === "true" || value === "1"),
+  PGHOST: z.string().optional(),
+  PGPORT: z.coerce.number().int().positive().optional(),
+  PGDATABASE: z.string().optional(),
+  PGUSER: z.string().optional(),
+  PGPASSWORD: z.string().optional(),
+  DATABASE_POOL_MAX: z.coerce.number().int().positive().default(10),
+  DATABASE_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  DATABASE_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
   TWILIO_ACCOUNT_SID: z.string().optional(),
   /** Twilio auth token for webhook signature verification. */
   TWILIO_AUTH_TOKEN: z.string().optional(),

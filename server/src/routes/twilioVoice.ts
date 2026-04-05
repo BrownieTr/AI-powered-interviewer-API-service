@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import type Database from "better-sqlite3";
+import type { Pool } from "pg";
 import type { InferenceClient } from "@huggingface/inference";
 import twilio from "twilio";
 import type { Config } from "../config.js";
@@ -72,7 +72,7 @@ function twilioSignatureGuard(config: Config) {
   };
 }
 
-export function createTwilioVoiceRouter(db: Database.Database, hf: InferenceClient, config: Config) {
+export function createTwilioVoiceRouter(db: Pool, hf: InferenceClient, config: Config) {
   const r = Router();
   const guard = twilioSignatureGuard(config);
 

@@ -3,7 +3,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt, { type SignOptions } from "jsonwebtoken";
 import { z } from "zod";
-import type Database from "better-sqlite3";
+import type { Pool } from "pg";
 import type { Config } from "../config.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
 
@@ -21,7 +21,7 @@ const loginSchema = z.object({
 const DUMMY_HASH =
   "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 
-export function createAuthRouter(db: Database.Database, config: Config) {
+export function createAuthRouter(db: Pool, config: Config) {
   const r = Router();
 
   r.post(
@@ -37,11 +37,12 @@ export function createAuthRouter(db: Database.Database, config: Config) {
       const passwordHash = await bcrypt.hash(password, 12);
       const t = Date.now();
       try {
-        db.prepare(
-          `INSERT INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)`
-        ).run(id, email.toLowerCase(), passwordHash, t);
+        await db.query(
+          `INSERT INTO users (id, email, password_hash, created_at) VALUES ($1, $2, $3, $4)`,
+          [id, email.toLowerCase(), passwordHash, t]
+        );
       } catch (e: unknown) {
-        if (e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "SQLITE_CONSTRAINT_UNIQUE") {
+        if (e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "23505") {
           res.status(409).json({ error: "Email already registered" });
           return;
         }
@@ -65,9 +66,11 @@ export function createAuthRouter(db: Database.Database, config: Config) {
         return;
       }
       const email = parsed.data.email.toLowerCase();
-      const user = db
-        .prepare(`SELECT id, email, password_hash FROM users WHERE email = ?`)
-        .get(email) as { id: string; email: string; password_hash: string } | undefined;
+      const userQuery = await db.query<{ id: string; email: string; password_hash: string }>(
+        `SELECT id, email, password_hash FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+        [email]
+      );
+      const user = userQuery.rows[0];
       const hash = user?.password_hash ?? DUMMY_HASH;
       const ok = await bcrypt.compare(parsed.data.password, hash);
       if (!user || !ok) {

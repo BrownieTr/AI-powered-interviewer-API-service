@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
-import type Database from "better-sqlite3";
+import type { Pool } from "pg";
 import type { InferenceClient } from "@huggingface/inference";
 import type { Config } from "../config.js";
 import {
@@ -23,31 +23,31 @@ function now(): number {
   return Date.now();
 }
 
-async function ensureVoiceSystemUser(db: Database.Database, config: Config): Promise<{ id: string }> {
-  const existing = db
-    .prepare("SELECT id FROM users WHERE email = ?")
-    .get(config.TWILIO_SYSTEM_USER_EMAIL.toLowerCase()) as { id: string } | undefined;
+async function ensureVoiceSystemUser(db: Pool, config: Config): Promise<{ id: string }> {
+  const existing = await db.query<{ id: string }>("SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1", [
+    config.TWILIO_SYSTEM_USER_EMAIL.toLowerCase(),
+  ]);
 
-  if (existing) {
-    return existing;
+  if (existing.rows[0]) {
+    return existing.rows[0];
   }
 
   const id = randomUUID();
   const createdAt = now();
   const hash = await bcrypt.hash(SYSTEM_USER_PASSWORD, 12);
 
-  db.prepare("INSERT INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)").run(
+  await db.query("INSERT INTO users (id, email, password_hash, created_at) VALUES ($1, $2, $3, $4)", [
     id,
     config.TWILIO_SYSTEM_USER_EMAIL.toLowerCase(),
     hash,
-    createdAt
-  );
+    createdAt,
+  ]);
 
   return { id };
 }
 
-function upsertCallSession(
-  db: Database.Database,
+async function upsertCallSession(
+  db: Pool,
   input: {
     callSid: string;
     interviewId: string;
@@ -58,7 +58,7 @@ function upsertCallSession(
   }
 ) {
   const timestamp = now();
-  db.prepare(
+  await db.query(
     `INSERT INTO call_sessions (
       call_sid,
       interview_id,
@@ -68,44 +68,45 @@ function upsertCallSession(
       call_status,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     ON CONFLICT(call_sid) DO UPDATE SET
       interview_id = excluded.interview_id,
       user_id = excluded.user_id,
       from_number = excluded.from_number,
       to_number = excluded.to_number,
       call_status = excluded.call_status,
-      updated_at = excluded.updated_at`
-  ).run(
-    input.callSid,
-    input.interviewId,
-    input.userId,
-    input.fromNumber ?? null,
-    input.toNumber ?? null,
-    input.callStatus,
-    timestamp,
-    timestamp
+      updated_at = excluded.updated_at`,
+    [
+      input.callSid,
+      input.interviewId,
+      input.userId,
+      input.fromNumber ?? null,
+      input.toNumber ?? null,
+      input.callStatus,
+      timestamp,
+      timestamp,
+    ]
   );
 }
 
-function getCallSession(db: Database.Database, callSid: string): CallSessionRow | null {
-  const row = db
-    .prepare("SELECT call_sid, interview_id, user_id, call_status FROM call_sessions WHERE call_sid = ?")
-    .get(callSid) as CallSessionRow | undefined;
-  return row ?? null;
+async function getCallSession(db: Pool, callSid: string): Promise<CallSessionRow | null> {
+  const row = await db.query<CallSessionRow>(
+    "SELECT call_sid, interview_id, user_id, call_status FROM call_sessions WHERE call_sid = $1 LIMIT 1",
+    [callSid]
+  );
+  return row.rows[0] ?? null;
 }
 
-function latestAssistantLine(sessionId: string, db: Database.Database): string | null {
-  const row = db
-    .prepare(
-      `SELECT content
-       FROM messages
-       WHERE interview_id = ? AND role = 'assistant'
-       ORDER BY created_at DESC
-       LIMIT 1`
-    )
-    .get(sessionId) as { content: string } | undefined;
-  return row?.content ?? null;
+async function latestAssistantLine(sessionId: string, db: Pool): Promise<string | null> {
+  const row = await db.query<{ content: string }>(
+    `SELECT content
+     FROM messages
+     WHERE interview_id = $1 AND role = 'assistant'
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [sessionId]
+  );
+  return row.rows[0]?.content ?? null;
 }
 
 function ensureCallSid(callSid: string | undefined): string {
@@ -115,8 +116,8 @@ function ensureCallSid(callSid: string | undefined): string {
   return callSid;
 }
 
-export function bindCallToInterview(
-  db: Database.Database,
+export async function bindCallToInterview(
+  db: Pool,
   input: {
     callSid: string;
     interviewId: string;
@@ -125,8 +126,8 @@ export function bindCallToInterview(
     toNumber?: string;
     callStatus?: string;
   }
-): void {
-  upsertCallSession(db, {
+): Promise<void> {
+  await upsertCallSession(db, {
     callSid: input.callSid,
     interviewId: input.interviewId,
     userId: input.userId,
@@ -137,7 +138,7 @@ export function bindCallToInterview(
 }
 
 export async function initVoiceCall(
-  db: Database.Database,
+  db: Pool,
   hf: InferenceClient,
   config: Config,
   input: {
@@ -148,12 +149,12 @@ export async function initVoiceCall(
   }
 ): Promise<{ callSid: string; interviewId: string; assistantMessage: string }> {
   const callSid = ensureCallSid(input.callSid);
-  const existing = getCallSession(db, callSid);
+  const existing = await getCallSession(db, callSid);
 
   if (existing) {
-    const existingMessage = latestAssistantLine(existing.interview_id, db);
+    const existingMessage = await latestAssistantLine(existing.interview_id, db);
     if (existingMessage) {
-      upsertCallSession(db, {
+      await upsertCallSession(db, {
         callSid,
         interviewId: existing.interview_id,
         userId: existing.user_id,
@@ -179,7 +180,7 @@ export async function initVoiceCall(
     config.TWILIO_DEFAULT_JOB_DESCRIPTION
   );
 
-  upsertCallSession(db, {
+  await upsertCallSession(db, {
     callSid,
     interviewId: opened.sessionId,
     userId: systemUser.id,
@@ -196,7 +197,7 @@ export async function initVoiceCall(
 }
 
 export async function handleVoiceTurn(
-  db: Database.Database,
+  db: Pool,
   hf: InferenceClient,
   config: Config,
   input: {
@@ -206,7 +207,7 @@ export async function handleVoiceTurn(
   }
 ): Promise<{ assistantMessage: string; interviewCompleted: boolean }> {
   const callSid = ensureCallSid(input.callSid);
-  const call = getCallSession(db, callSid);
+  const call = await getCallSession(db, callSid);
   if (!call) {
     throw new Error("No interview session found for this call. Start the call again.");
   }
@@ -221,7 +222,7 @@ export async function handleVoiceTurn(
 
   const out = await appendCandidateTurn(db, hf, config, call.user_id, call.interview_id, transcript);
   if ("error" in out && out.error === "not_active") {
-    const detail = getSessionDetail(db, call.user_id, call.interview_id);
+    const detail = await getSessionDetail(db, call.user_id, call.interview_id);
     return {
       assistantMessage:
         detail?.outcomeSummary ?? "This interview has already ended. Thank you for your time today.",
@@ -232,7 +233,7 @@ export async function handleVoiceTurn(
     throw new Error("Unable to append candidate turn for this call");
   }
 
-  upsertCallSession(db, {
+  await upsertCallSession(db, {
     callSid,
     interviewId: call.interview_id,
     userId: call.user_id,
@@ -246,19 +247,19 @@ export async function handleVoiceTurn(
 }
 
 export async function markCallStatus(
-  db: Database.Database,
+  db: Pool,
   hf: InferenceClient,
   config: Config,
   input: { callSid?: string; callStatus?: string }
 ): Promise<void> {
   const callSid = ensureCallSid(input.callSid);
-  const call = getCallSession(db, callSid);
+  const call = await getCallSession(db, callSid);
   if (!call) {
     return;
   }
 
   const status = (input.callStatus ?? call.call_status).toLowerCase();
-  upsertCallSession(db, {
+  await upsertCallSession(db, {
     callSid,
     interviewId: call.interview_id,
     userId: call.user_id,

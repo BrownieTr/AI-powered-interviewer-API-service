@@ -11,7 +11,7 @@ import { createPhoneRouter } from "./routes/phone.js";
 import { createTwilioVoiceRouter } from "./routes/twilioVoice.js";
 
 const config = loadConfig();
-const db = getDb(config);
+const db = await getDb(config);
 const hf = createInferenceClient(config);
 
 const app = express();
