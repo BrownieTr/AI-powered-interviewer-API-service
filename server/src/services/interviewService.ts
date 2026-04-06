@@ -199,6 +199,18 @@ export async function getSessionDetail(db: Pool, userId: string, sessionId: stri
       createdAt: toNum(m.created_at),
     }));
 
+  let normalizedTranscript = publicTranscript;
+  if (interview.outcome_summary) {
+    const outcome = interview.outcome_summary.trim();
+    const duplicateIdx = [...publicTranscript]
+      .reverse()
+      .findIndex((m) => m.role === "assistant" && m.content.trim() === outcome);
+    if (duplicateIdx !== -1) {
+      const originalIdx = publicTranscript.length - 1 - duplicateIdx;
+      normalizedTranscript = publicTranscript.filter((_, idx) => idx !== originalIdx);
+    }
+  }
+
   return {
     id: interview.id,
     status: interview.status,
@@ -207,7 +219,7 @@ export async function getSessionDetail(db: Pool, userId: string, sessionId: stri
     outcomeSummary: interview.outcome_summary,
     createdAt: toNum(interview.created_at),
     updatedAt: toNum(interview.updated_at),
-    transcript: publicTranscript,
+    transcript: normalizedTranscript,
   };
 }
 

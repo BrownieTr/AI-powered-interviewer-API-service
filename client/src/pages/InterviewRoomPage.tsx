@@ -12,7 +12,7 @@ type SessionDetail = {
   transcript: TranscriptLine[];
 };
 
-const LIVE_POLL_MS = 2500;
+const LIVE_POLL_MS = 1500;
 
 export function InterviewRoomPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -110,14 +110,14 @@ export function InterviewRoomPage() {
   const active = session.status === "active";
 
   useEffect(() => {
-    if (!active || !sessionId) return;
+    if (!sessionId || !session || session.status === "completed") return;
     const timer = setInterval(() => {
       void load().catch(() => {
         // Keep silent polling failures from interrupting the live transcript view.
       });
     }, LIVE_POLL_MS);
     return () => clearInterval(timer);
-  }, [active, sessionId, load]);
+  }, [sessionId, session, load]);
 
   return (
     <div className="room">
