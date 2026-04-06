@@ -108,7 +108,7 @@ export async function completeChat(
       role: m.role,
       content: m.content,
     })),
-    max_tokens: 800,
+    max_tokens: 400,
     temperature: 0.65,
   };
 
