@@ -119,11 +119,16 @@ export function createPhoneRouter(db: Pool, hf: InferenceClient, config: Config)
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Could not initiate outbound call";
-        res.status(502).json({ error: message, sessionId: out.sessionId });
+        res.status(201).json({
+          ...out,
+          sessionId: out.sessionId,
+          callInitiated: false,
+          warning: message,
+        });
         return;
       }
 
-      res.status(201).json(out);
+      res.status(201).json({ ...out, callInitiated: true });
     })
   );
 

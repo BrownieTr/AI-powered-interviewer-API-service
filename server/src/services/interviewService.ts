@@ -6,6 +6,9 @@ import { completeChat, type ChatMessage } from "./hfInference.js";
 
 const MAX_DOC_LEN = 48_000;
 const MAX_CONTEXT_MESSAGES = 40;
+const KICKOFF_TIMEOUT_MS = 12_000;
+const KICKOFF_FALLBACK_MESSAGE =
+  "Hello, thanks for joining today. I will conduct this interview for the role you applied to. To begin, can you briefly introduce yourself and summarize your most relevant experience?";
 
 function buildSystemPrompt(resume: string, jobDescription: string): string {
   return `You are a professional hiring manager conducting a live phone-style interview for the role described below.
@@ -92,7 +95,12 @@ export async function startPhoneSession(
   };
 
   const history: ChatMessage[] = [{ role: "system", content: systemContent }, kickoff];
-  const reply = await completeChat(hf, config, history);
+  const reply = await Promise.race([
+    completeChat(hf, config, history),
+    new Promise<string>((resolve) => {
+      setTimeout(() => resolve(KICKOFF_FALLBACK_MESSAGE), KICKOFF_TIMEOUT_MS);
+    }),
+  ]).catch(() => KICKOFF_FALLBACK_MESSAGE);
 
   await db.query(
     `INSERT INTO messages (id, interview_id, role, content, created_at) VALUES ($1, $2, 'assistant', $3, $4)`,
