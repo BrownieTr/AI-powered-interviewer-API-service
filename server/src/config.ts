@@ -73,12 +73,19 @@ export function loadConfig(): Config {
   const normalizedEnv = {
     ...process.env,
     CLIENT_ORIGIN:
-      process.env.CLIENT_ORIGIN ?? process.env["CLIENT_ORIGIN"] ?? process.env.client_origin,
+      process.env.CLIENT_ORIGIN ?? process.env["CLIENT-ORIGIN"] ?? process.env.client_origin,
   };
   const parsed = envSchema.safeParse(normalizedEnv);
   if (!parsed.success) {
     const msg = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new Error(`Invalid environment: ${msg}`);
+  }
+  if (
+    parsed.data.NODE_ENV === "production" &&
+    parsed.data.CLIENT_ORIGIN &&
+    /^https?:\/\/localhost(?::\d+)?$/i.test(parsed.data.CLIENT_ORIGIN)
+  ) {
+    throw new Error("Invalid environment: CLIENT_ORIGIN cannot be localhost in production.");
   }
   cached = parsed.data;
   return parsed.data;

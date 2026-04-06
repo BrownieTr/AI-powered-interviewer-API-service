@@ -24,6 +24,8 @@ if (!corsOrigin) {
   );
 }
 
+console.log(`Configured CORS origin: ${corsOrigin}`);
+
 app.set("trust proxy", 1);
 
 app.use(
