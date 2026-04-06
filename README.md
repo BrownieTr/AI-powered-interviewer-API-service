@@ -26,6 +26,10 @@ Monorepo for an **AI-powered RESTful API** in the **AI Phone Agent / Virtual Fro
 - Optional quota/admin settings:
   - `FREE_CALLS_LIMIT_DEFAULT` (default `25`) for new users.
   - `ADMIN_SEED_EMAIL` + `ADMIN_SEED_PASSWORD` to auto-provision an admin account at startup.
+- Optional forgot-password settings (required only if enabling email reset):
+  - `RESET_PASSWORD_BASE_URL` (frontend reset page URL)
+  - `RESET_PASSWORD_TOKEN_TTL_MIN` (default `30`)
+  - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
 
 Inference free tiers and quotas change over time; check [HF pricing / limits](https://huggingface.co/pricing) for current rules. Gated models (e.g. Llama) require accepting the license on the model page first.
 
@@ -70,6 +74,8 @@ npm run dev
 | ------- | ---------------------------------- | -------------------------------------------------------------------------- |
 | `POST`  | `/api/auth/register`               | Create account → JWT                                                       |
 | `POST`  | `/api/auth/login`                  | Sign in → JWT                                                              |
+| `POST`  | `/api/auth/forgot-password`        | Request password reset email                                               |
+| `POST`  | `/api/auth/reset-password`         | Reset password with token                                                  |
 | `GET`   | `/api/users/me`                    | Current user profile                                                       |
 | `PATCH` | `/api/users/me/password`           | Change password                                                            |
 | `GET`   | `/api/phone/sessions`              | List interview sessions                                                    |

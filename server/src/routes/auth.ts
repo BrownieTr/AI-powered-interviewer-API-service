@@ -7,6 +7,8 @@ import type { Pool } from "pg";
 import type { Config } from "../config.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
 import { createUser, getUserForAuthByEmail, normalizeEmail } from "../services/userService.js";
+import { consumePasswordResetToken, createPasswordResetToken } from "../services/passwordResetService.js";
+import { isPasswordResetEmailEnabled, sendPasswordResetEmail } from "../services/mailService.js";
 
 const registerSchema = z.object({
   email: z.string().email().max(320),
@@ -16,6 +18,15 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(32).max(512),
+  newPassword: z.string().min(8).max(128),
 });
 
 /** Valid bcrypt hash so compare() never throws when the user row is missing. */
@@ -97,6 +108,59 @@ export function createAuthRouter(db: Pool, config: Config) {
           freeCallsLimit: user.freeCallsLimit,
         },
       });
+    })
+  );
+
+  r.post(
+    "/forgot-password",
+    asyncHandler(async (req, res) => {
+      const parsed = forgotPasswordSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+        return;
+      }
+
+      if (!isPasswordResetEmailEnabled(config)) {
+        res.status(503).json({ error: "Password reset is not configured." });
+        return;
+      }
+
+      const user = await getUserForAuthByEmail(db, parsed.data.email);
+      if (user) {
+        const token = await createPasswordResetToken(db, user.id, config.RESET_PASSWORD_TOKEN_TTL_MIN);
+        const resetLink = `${config.RESET_PASSWORD_BASE_URL}?token=${encodeURIComponent(token)}`;
+        await sendPasswordResetEmail(config, {
+          to: user.email,
+          resetLink,
+          ttlMinutes: config.RESET_PASSWORD_TOKEN_TTL_MIN,
+        });
+      }
+
+      // Always return a generic response to avoid user enumeration.
+      res.status(202).json({
+        ok: true,
+        message: "If the email exists, a password reset link has been sent.",
+      });
+    })
+  );
+
+  r.post(
+    "/reset-password",
+    asyncHandler(async (req, res) => {
+      const parsed = resetPasswordSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+        return;
+      }
+
+      const nextPasswordHash = await bcrypt.hash(parsed.data.newPassword, 12);
+      const ok = await consumePasswordResetToken(db, parsed.data.token, nextPasswordHash);
+      if (!ok) {
+        res.status(400).json({ error: "Invalid or expired reset token" });
+        return;
+      }
+
+      res.json({ ok: true });
     })
   );
 

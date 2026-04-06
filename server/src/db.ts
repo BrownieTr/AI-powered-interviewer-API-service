@@ -123,6 +123,15 @@ async function initSchema(client: PoolClient) {
       created_at BIGINT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at BIGINT NOT NULL,
+      used_at BIGINT,
+      created_at BIGINT NOT NULL
+    );
+
     -- One-time data cleanup before constraints are enforced.
     UPDATE usage_events
     SET event_type = CASE
@@ -161,6 +170,8 @@ async function initSchema(client: PoolClient) {
     CREATE INDEX IF NOT EXISTS idx_usage_events_user_created_at ON usage_events(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_usage_events_in_quota_created_at ON usage_events(created_at)
       WHERE included_in_quota = true;
+    CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user ON password_reset_tokens(user_id);
+    CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires ON password_reset_tokens(expires_at);
   `);
 }
 
