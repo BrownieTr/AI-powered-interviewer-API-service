@@ -21,7 +21,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <>
               <Link to="/">Sessions</Link>
               <Link to="/interview/new">New interview</Link>
-              {user.role === "admin" && <Link to="/admin/usage">Admin usage</Link>}
+              {user.role === "admin" && <Link to="/admin/dashboard">Admin dashboard</Link>}
               {user.role === "admin" ? (
                 <span className="layout-quota">Admin · unlimited calls</span>
               ) : (

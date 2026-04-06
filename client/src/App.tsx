@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { DashboardPage } from "./pages/DashboardPage";
-import { AdminUsagePage } from "./pages/AdminUsagePage";
+import { AdminDashboard } from "./pages/AdminDashboardPage";
 import { InterviewRoomPage } from "./pages/InterviewRoomPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NewInterviewPage } from "./pages/NewInterviewPage";
@@ -84,10 +84,10 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/admin/usage"
+        path="/admin/dashboard"
         element={
           <Protected>
-            <AdminUsagePage />
+            <AdminDashboard />
           </Protected>
         }
       />
