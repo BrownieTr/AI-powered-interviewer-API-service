@@ -35,11 +35,27 @@ export function NewInterviewPage() {
         body.append("resumeFile", resumeFile);
       }
 
-      const res = await api<{ sessionId: string }>("/api/phone/sessions", {
+      const res = await api<{
+        sessionId: string;
+        callInitiated?: boolean;
+        warning?: string;
+        warningCode?: string;
+        warningStatus?: number;
+        warningMoreInfo?: string;
+      }>("/api/phone/sessions", {
         method: "POST",
         body,
       });
-      navigate(`/interview/${res.sessionId}`, { replace: true });
+      navigate(`/interview/${res.sessionId}`, {
+        replace: true,
+        state: {
+          callInitiated: res.callInitiated ?? true,
+          warning: res.warning,
+          warningCode: res.warningCode,
+          warningStatus: res.warningStatus,
+          warningMoreInfo: res.warningMoreInfo,
+        },
+      });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not start session");
     } finally {

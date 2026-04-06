@@ -22,6 +22,27 @@ import {
   startPhoneSession,
 } from "../services/interviewService.js";
 
+type TwilioLikeError = {
+  message?: string;
+  code?: number | string;
+  status?: number;
+  moreInfo?: string;
+};
+
+function getTwilioFailurePayload(error: unknown) {
+  const fallback = "Could not initiate outbound call";
+  if (!error || typeof error !== "object") {
+    return { warning: fallback };
+  }
+  const e = error as TwilioLikeError;
+  return {
+    warning: e.message ?? fallback,
+    warningCode: e.code !== undefined ? String(e.code) : undefined,
+    warningStatus: e.status,
+    warningMoreInfo: e.moreInfo,
+  };
+}
+
 const startSchema = z.object({
   resume: z.string().trim().min(1).max(48_000).optional(),
   jobDescription: z.string().trim().min(1).max(48_000),
@@ -79,6 +100,14 @@ export function createPhoneRouter(db: Pool, hf: InferenceClient, config: Config)
         return;
       }
 
+      if (config.TWILIO_PHONE_NUMBER && candidatePhone.trim() === config.TWILIO_PHONE_NUMBER.trim()) {
+        res.status(400).json({
+          error:
+            "candidatePhone cannot be the same as TWILIO_PHONE_NUMBER. Use a different destination number.",
+        });
+        return;
+      }
+
       if (req.file) {
         try {
           resume = await extractResumeText(req.file);
@@ -118,12 +147,12 @@ export function createPhoneRouter(db: Pool, hf: InferenceClient, config: Config)
           callStatus: "queued",
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Could not initiate outbound call";
+        const failure = getTwilioFailurePayload(error);
         res.status(201).json({
           ...out,
           sessionId: out.sessionId,
           callInitiated: false,
-          warning: message,
+          ...failure,
         });
         return;
       }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import "./InterviewRoom.css";
 
@@ -14,6 +14,16 @@ type SessionDetail = {
 
 export function InterviewRoomPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const location = useLocation();
+  const startState = (location.state as
+    | {
+        callInitiated?: boolean;
+        warning?: string;
+        warningCode?: string;
+        warningStatus?: number;
+        warningMoreInfo?: string;
+      }
+    | null) ?? null;
   const [session, setSession] = useState<SessionDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -114,6 +124,14 @@ export function InterviewRoomPage() {
         Status: <strong>{session.status}</strong>
         {active ? " — respond as the candidate." : " — transcript and outcome below."}
       </p>
+      {startState && startState.callInitiated === false && startState.warning && (
+        <p className="form-error">
+          Call was not initiated: {startState.warning}
+          {startState.warningCode ? ` (code: ${startState.warningCode})` : ""}
+          {startState.warningStatus ? ` (status: ${startState.warningStatus})` : ""}
+          {startState.warningMoreInfo ? ` ${startState.warningMoreInfo}` : ""}
+        </p>
+      )}
       {error && <p className="form-error">{error}</p>}
 
       <div className="transcript" role="log" aria-live="polite">
