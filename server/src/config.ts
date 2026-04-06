@@ -46,6 +46,9 @@ const envSchema = z.object({
   DATABASE_POOL_MAX: z.coerce.number().int().positive().default(10),
   DATABASE_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   DATABASE_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  FREE_CALLS_LIMIT_DEFAULT: z.coerce.number().int().nonnegative().default(25),
+  ADMIN_SEED_EMAIL: z.string().email().optional(),
+  ADMIN_SEED_PASSWORD: z.string().min(8).max(128).optional(),
   TWILIO_ACCOUNT_SID: z.string().optional(),
   /** Twilio auth token for webhook signature verification. */
   TWILIO_AUTH_TOKEN: z.string().optional(),
@@ -102,6 +105,9 @@ export function loadConfig(): Config {
     throw new Error(
       `Invalid environment: CLIENT_ORIGIN cannot be localhost in production (received: ${parsed.data.CLIENT_ORIGIN}, source: ${originSource}).`
     );
+  }
+  if ((parsed.data.ADMIN_SEED_EMAIL && !parsed.data.ADMIN_SEED_PASSWORD) || (!parsed.data.ADMIN_SEED_EMAIL && parsed.data.ADMIN_SEED_PASSWORD)) {
+    throw new Error("Invalid environment: set both ADMIN_SEED_EMAIL and ADMIN_SEED_PASSWORD together, or omit both.");
   }
   cached = parsed.data;
   return parsed.data;

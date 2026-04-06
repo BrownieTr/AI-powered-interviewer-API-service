@@ -5,6 +5,7 @@ import type { Pool } from "pg";
 import type { Config } from "../config.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
+import { getUserProfileById } from "../services/userService.js";
 
 const passwordSchema = z.object({
   currentPassword: z.string().min(1),
@@ -21,19 +22,18 @@ export function createUsersRouter(db: Pool, config: Config) {
     "/me",
     asyncHandler(async (req, res) => {
       const userId = req.auth!.sub;
-      const rowQuery = await db.query<{ id: string; email: string; created_at: number }>(
-        `SELECT id, email, created_at FROM users WHERE id = $1 LIMIT 1`,
-        [userId]
-      );
-      const row = rowQuery.rows[0];
-      if (!row) {
+      const profile = await getUserProfileById(db, userId);
+      if (!profile) {
         res.status(404).json({ error: "User not found" });
         return;
       }
       res.json({
-        id: row.id,
-        email: row.email,
-        createdAt: row.created_at,
+        id: profile.id,
+        email: profile.email,
+        role: profile.role,
+        freeCallsUsed: profile.freeCallsUsed,
+        freeCallsLimit: profile.freeCallsLimit,
+        createdAt: profile.createdAt,
       });
     })
   );

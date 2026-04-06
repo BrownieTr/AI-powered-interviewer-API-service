@@ -130,6 +130,14 @@ export function createPhoneRouter(db: Pool, hf: InferenceClient, config: Config)
         return;
       }
       const out = await startPhoneSession(db, hf, config, req.auth!.sub, resume, jobDescription);
+      if ("error" in out) {
+        if (out.error === "quota_exceeded") {
+          res.status(402).json({ error: "Free call quota reached", quota: out.quota });
+          return;
+        }
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
 
       try {
         const publicBaseUrl = getTwilioPublicBaseUrl(config);
@@ -197,6 +205,10 @@ export function createPhoneRouter(db: Pool, hf: InferenceClient, config: Config)
         res.status(409).json({ error: "This interview is already completed" });
         return;
       }
+      if (result.error === "quota_exceeded") {
+        res.status(402).json({ error: "Free call quota reached", quota: result.quota });
+        return;
+      }
       res.json({ assistantMessage: result.assistantMessage });
     })
   );
@@ -207,6 +219,10 @@ export function createPhoneRouter(db: Pool, hf: InferenceClient, config: Config)
       const result = await completeSession(db, hf, config, req.auth!.sub, req.params.sessionId);
       if (result.error === "not_found") {
         res.status(404).json({ error: "Session not found" });
+        return;
+      }
+      if (result.error === "quota_exceeded") {
+        res.status(402).json({ error: "Free call quota reached", quota: result.quota });
         return;
       }
       if ("alreadyCompleted" in result && result.alreadyCompleted) {

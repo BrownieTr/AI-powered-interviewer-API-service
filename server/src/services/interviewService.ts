@@ -3,6 +3,7 @@ import type { Pool } from "pg";
 import type { InferenceClient } from "@huggingface/inference";
 import type { Config } from "../config.js";
 import { completeChat, type ChatMessage } from "./hfInference.js";
+import { assertCanUseAi, recordAiUsage } from "./quotaService.js";
 
 const MAX_DOC_LEN = 48_000;
 const MAX_CONTEXT_MESSAGES = 40;
@@ -46,7 +47,7 @@ type SessionListRow = {
 export async function listSessions(db: Pool, userId: string) {
   const rows = await db.query<SessionListRow>(
     `SELECT id, status, created_at, updated_at, outcome_summary
-     FROM interviews WHERE user_id = $1 ORDER BY updated_at DESC`,
+      FROM interviews WHERE user_id = $1 ORDER BY updated_at DESC`,
     [userId]
   );
   return rows.rows.map((row) => ({
@@ -73,7 +74,7 @@ export async function startPhoneSession(
     await client.query("BEGIN");
     await client.query(
       `INSERT INTO interviews (id, user_id, resume, job_description, status, outcome_summary, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 'active', NULL, $5, $6)`,
+        VALUES ($1, $2, $3, $4, 'active', NULL, $5, $6)`,
       [id, userId, resume, jobDescription, t, t]
     );
     await client.query(
@@ -86,6 +87,19 @@ export async function startPhoneSession(
     throw error;
   } finally {
     client.release();
+  }
+
+  const usage = await recordAiUsage(db, config, {
+    userId,
+    interviewId: id,
+    eventType: "session_start",
+  });
+  if (!usage.ok) {
+    await db.query(`DELETE FROM interviews WHERE id = $1 AND user_id = $2`, [id, userId]);
+    return {
+      error: usage.reason,
+      quota: usage.quota,
+    };
   }
 
   const kickoff: ChatMessage = {
@@ -112,6 +126,7 @@ export async function startPhoneSession(
     sessionId: id,
     assistantMessage: reply,
     createdAt: t,
+    quota: usage.quota,
   };
 }
 
@@ -150,11 +165,25 @@ export async function appendCandidateTurn(
   if (!row) return { error: "not_found" as const };
   if (row.status !== "active") return { error: "not_active" as const };
 
+  const allowed = await assertCanUseAi(db, userId, config);
+  if (!allowed.ok) {
+    return { error: allowed.reason, quota: allowed.quota };
+  }
+
   const t = now();
   await db.query(
     `INSERT INTO messages (id, interview_id, role, content, created_at) VALUES ($1, $2, 'user', $3, $4)`,
     [randomUUID(), sessionId, content, t]
   );
+
+  const usage = await recordAiUsage(db, config, {
+    userId,
+    interviewId: sessionId,
+    eventType: "message_turn",
+  });
+  if (!usage.ok) {
+    return { error: usage.reason, quota: usage.quota };
+  }
 
   const messages = await loadMessagesForModel(db, sessionId);
   const reply = await completeChat(hf, config, messages);
@@ -179,7 +208,7 @@ export async function getSessionDetail(db: Pool, userId: string, sessionId: stri
     updated_at: string | number;
   }>(
     `SELECT id, status, resume, job_description, outcome_summary, created_at, updated_at
-     FROM interviews WHERE id = $1 AND user_id = $2 LIMIT 1`,
+      FROM interviews WHERE id = $1 AND user_id = $2 LIMIT 1`,
     [sessionId, userId]
   );
 
@@ -239,6 +268,20 @@ export async function completeSession(
   if (row.status === "completed") {
     const detail = await getSessionDetail(db, userId, sessionId);
     return { alreadyCompleted: true as const, session: detail };
+  }
+
+  const allowed = await assertCanUseAi(db, userId, config);
+  if (!allowed.ok) {
+    return { error: allowed.reason, quota: allowed.quota };
+  }
+
+  const usage = await recordAiUsage(db, config, {
+    userId,
+    interviewId: sessionId,
+    eventType: "session_complete",
+  });
+  if (!usage.ok) {
+    return { error: usage.reason, quota: usage.quota };
   }
 
   const closer: ChatMessage = {

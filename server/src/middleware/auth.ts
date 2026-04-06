@@ -14,6 +14,7 @@ export function requireAuth(config: Config): RequestHandler {
       const payload = jwt.verify(token, config.JWT_SECRET) as jwt.JwtPayload & {
         sub: string;
         email: string;
+        role?: "user" | "admin";
       };
       if (!payload.sub || !payload.email) {
         res.status(401).json({ error: "Invalid token" });

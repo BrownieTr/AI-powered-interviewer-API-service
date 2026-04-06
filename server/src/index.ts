@@ -9,9 +9,12 @@ import { createAuthRouter } from "./routes/auth.js";
 import { createUsersRouter } from "./routes/users.js";
 import { createPhoneRouter } from "./routes/phone.js";
 import { createTwilioVoiceRouter } from "./routes/twilioVoice.js";
+import { createAdminRouter } from "./routes/admin.js";
+import { ensureSeedAdminUser } from "./services/adminSeedService.js";
 
 const config = loadConfig();
 const db = await getDb(config);
+await ensureSeedAdminUser(db, config);
 const hf = createInferenceClient(config);
 
 const app = express();
@@ -73,6 +76,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/auth", authLimiter, createAuthRouter(db, config));
 app.use("/api/users", createUsersRouter(db, config));
+app.use("/api/admin", createAdminRouter(db, config));
 app.use("/api/phone", createPhoneRouter(db, hf, config));
 app.use("/api/twilio/voice", createTwilioVoiceRouter(db, hf, config));
 

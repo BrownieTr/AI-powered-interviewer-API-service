@@ -9,6 +9,7 @@ import {
   getSessionDetail,
   startPhoneSession,
 } from "./interviewService.js";
+import { createUser, getUserIdByEmail } from "./userService.js";
 
 type CallSessionRow = {
   call_sid: string;
@@ -24,24 +25,25 @@ function now(): number {
 }
 
 async function ensureVoiceSystemUser(db: Pool, config: Config): Promise<{ id: string }> {
-  const existing = await db.query<{ id: string }>("SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1", [
-    config.TWILIO_SYSTEM_USER_EMAIL.toLowerCase(),
-  ]);
+  const existingId = await getUserIdByEmail(db, config.TWILIO_SYSTEM_USER_EMAIL);
 
-  if (existing.rows[0]) {
-    return existing.rows[0];
+  if (existingId) {
+    return { id: existingId };
   }
 
   const id = randomUUID();
   const createdAt = now();
   const hash = await bcrypt.hash(SYSTEM_USER_PASSWORD, 12);
 
-  await db.query("INSERT INTO users (id, email, password_hash, created_at) VALUES ($1, $2, $3, $4)", [
+  await createUser(db, {
     id,
-    config.TWILIO_SYSTEM_USER_EMAIL.toLowerCase(),
-    hash,
+    email: config.TWILIO_SYSTEM_USER_EMAIL,
+    passwordHash: hash,
+    role: "user",
+    freeCallsUsed: 0,
+    freeCallsLimit: config.FREE_CALLS_LIMIT_DEFAULT,
     createdAt,
-  ]);
+  });
 
   return { id };
 }
@@ -100,10 +102,10 @@ async function getCallSession(db: Pool, callSid: string): Promise<CallSessionRow
 async function latestAssistantLine(sessionId: string, db: Pool): Promise<string | null> {
   const row = await db.query<{ content: string }>(
     `SELECT content
-     FROM messages
-     WHERE interview_id = $1 AND role = 'assistant'
-     ORDER BY created_at DESC
-     LIMIT 1`,
+      FROM messages
+      WHERE interview_id = $1 AND role = 'assistant'
+      ORDER BY created_at DESC
+      LIMIT 1`,
     [sessionId]
   );
   return row.rows[0]?.content ?? null;
@@ -179,6 +181,9 @@ export async function initVoiceCall(
     config.TWILIO_DEFAULT_RESUME,
     config.TWILIO_DEFAULT_JOB_DESCRIPTION
   );
+  if ("error" in opened) {
+    throw new Error("Unable to start interview session for this call.");
+  }
 
   await upsertCallSession(db, {
     callSid,
@@ -226,6 +231,13 @@ export async function handleVoiceTurn(
     return {
       assistantMessage:
         detail?.outcomeSummary ?? "This interview has already ended. Thank you for your time today.",
+      interviewCompleted: true,
+    };
+  }
+  if ("error" in out && out.error === "quota_exceeded") {
+    return {
+      assistantMessage:
+        "This interview session has reached its free AI quota. Please contact the administrator to continue.",
       interviewCompleted: true,
     };
   }

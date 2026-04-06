@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { Pool } from "pg";
 import type { Config } from "../config.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
+import { createUser, getUserForAuthByEmail, normalizeEmail } from "../services/userService.js";
 
 const registerSchema = z.object({
   email: z.string().email().max(320),
@@ -33,14 +34,20 @@ export function createAuthRouter(db: Pool, config: Config) {
         return;
       }
       const { email, password } = parsed.data;
+      const normalizedEmail = normalizeEmail(email);
       const id = randomUUID();
       const passwordHash = await bcrypt.hash(password, 12);
       const t = Date.now();
       try {
-        await db.query(
-          `INSERT INTO users (id, email, password_hash, created_at) VALUES ($1, $2, $3, $4)`,
-          [id, email.toLowerCase(), passwordHash, t]
-        );
+        await createUser(db, {
+          id,
+          email: normalizedEmail,
+          passwordHash,
+          role: "user",
+          freeCallsUsed: 0,
+          freeCallsLimit: config.FREE_CALLS_LIMIT_DEFAULT,
+          createdAt: t,
+        });
       } catch (e: unknown) {
         if (e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "23505") {
           res.status(409).json({ error: "Email already registered" });
@@ -49,10 +56,16 @@ export function createAuthRouter(db: Pool, config: Config) {
         throw e;
       }
       const signOpts: SignOptions = { expiresIn: config.JWT_EXPIRES_IN as SignOptions["expiresIn"] };
-      const token = jwt.sign({ sub: id, email: email.toLowerCase() }, config.JWT_SECRET, signOpts);
+      const token = jwt.sign({ sub: id, email: normalizedEmail, role: "user" }, config.JWT_SECRET, signOpts);
       res.status(201).json({
         token,
-        user: { id, email: email.toLowerCase() },
+        user: {
+          id,
+          email: normalizedEmail,
+          role: "user",
+          freeCallsUsed: 0,
+          freeCallsLimit: config.FREE_CALLS_LIMIT_DEFAULT,
+        },
       });
     })
   );
@@ -65,21 +78,25 @@ export function createAuthRouter(db: Pool, config: Config) {
         res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
         return;
       }
-      const email = parsed.data.email.toLowerCase();
-      const userQuery = await db.query<{ id: string; email: string; password_hash: string }>(
-        `SELECT id, email, password_hash FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-        [email]
-      );
-      const user = userQuery.rows[0];
-      const hash = user?.password_hash ?? DUMMY_HASH;
+      const user = await getUserForAuthByEmail(db, parsed.data.email);
+      const hash = user?.passwordHash ?? DUMMY_HASH;
       const ok = await bcrypt.compare(parsed.data.password, hash);
       if (!user || !ok) {
         res.status(401).json({ error: "Invalid email or password" });
         return;
       }
       const signOpts: SignOptions = { expiresIn: config.JWT_EXPIRES_IN as SignOptions["expiresIn"] };
-      const token = jwt.sign({ sub: user.id, email: user.email }, config.JWT_SECRET, signOpts);
-      res.json({ token, user: { id: user.id, email: user.email } });
+      const token = jwt.sign({ sub: user.id, email: user.email, role: user.role }, config.JWT_SECRET, signOpts);
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          freeCallsUsed: user.freeCallsUsed,
+          freeCallsLimit: user.freeCallsLimit,
+        },
+      });
     })
   );
 
