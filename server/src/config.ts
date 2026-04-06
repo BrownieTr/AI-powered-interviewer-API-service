@@ -74,10 +74,12 @@ let cached: Config | null = null;
 
 export function loadConfig(): Config {
   if (cached) return cached;
+  const rawClientOrigin = process.env.CLIENT_ORIGIN;
+  const rawClientOriginDashed = process.env["CLIENT-ORIGIN"];
+  const rawClientOriginLower = process.env.client_origin;
   const normalizedEnv = {
     ...process.env,
-    CLIENT_ORIGIN:
-      process.env.CLIENT_ORIGIN ?? process.env["CLIENT-ORIGIN"] ?? process.env.client_origin,
+    CLIENT_ORIGIN: rawClientOrigin ?? rawClientOriginDashed ?? rawClientOriginLower,
   };
   const parsed = envSchema.safeParse(normalizedEnv);
   if (!parsed.success) {
@@ -89,8 +91,16 @@ export function loadConfig(): Config {
     parsed.data.CLIENT_ORIGIN &&
     /^https?:\/\/localhost(?::\d+)?$/i.test(parsed.data.CLIENT_ORIGIN)
   ) {
+    const originSource =
+      rawClientOrigin === parsed.data.CLIENT_ORIGIN
+        ? "CLIENT_ORIGIN"
+        : rawClientOriginDashed === parsed.data.CLIENT_ORIGIN
+          ? "CLIENT-ORIGIN"
+          : rawClientOriginLower === parsed.data.CLIENT_ORIGIN
+            ? "client_origin"
+            : "unknown";
     throw new Error(
-      `Invalid environment: CLIENT_ORIGIN cannot be localhost in production (received: ${parsed.data.CLIENT_ORIGIN}).`
+      `Invalid environment: CLIENT_ORIGIN cannot be localhost in production (received: ${parsed.data.CLIENT_ORIGIN}, source: ${originSource}).`
     );
   }
   cached = parsed.data;
