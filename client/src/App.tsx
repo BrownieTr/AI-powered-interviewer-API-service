@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { DashboardPage } from "./pages/DashboardPage";
+import { AdminUsagePage } from "./pages/AdminUsagePage";
 import { InterviewRoomPage } from "./pages/InterviewRoomPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NewInterviewPage } from "./pages/NewInterviewPage";
@@ -79,6 +80,14 @@ function AppRoutes() {
         element={
           <Protected>
             <InterviewRoomPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/admin/usage"
+        element={
+          <Protected>
+            <AdminUsagePage />
           </Protected>
         }
       />
