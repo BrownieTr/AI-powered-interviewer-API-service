@@ -5,6 +5,10 @@ import "./Layout.css";
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
+  const freeCallsRemaining =
+    user && typeof user.freeCallsLimit === "number" && typeof user.freeCallsUsed === "number"
+      ? Math.max(0, user.freeCallsLimit - user.freeCallsUsed)
+      : null;
 
   return (
     <div className="layout">
@@ -17,6 +21,13 @@ export function Layout({ children }: { children: ReactNode }) {
             <>
               <Link to="/">Sessions</Link>
               <Link to="/interview/new">New interview</Link>
+              {user.role === "admin" ? (
+                <span className="layout-quota">Admin · unlimited calls</span>
+              ) : (
+                <span className="layout-quota">
+                  Free calls left: {freeCallsRemaining ?? "..."}
+                </span>
+              )}
               <span className="layout-email">{user.email}</span>
               <button type="button" className="layout-logout" onClick={logout}>
                 Log out

@@ -50,6 +50,16 @@
   white-space: nowrap;
 }
 
+.layout-quota {
+  font-size: 0.8rem;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  white-space: nowrap;
+}
+
 .layout-logout {
   padding: 0.35rem 0.75rem;
   font-size: 0.85rem;

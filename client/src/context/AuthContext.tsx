@@ -9,7 +9,14 @@ import {
 } from "react";
 import { api, getToken, setStoredToken } from "../api/client";
 
-export type User = { id: string; email: string; createdAt?: number };
+export type User = {
+  id: string;
+  email: string;
+  role?: "user" | "admin";
+  freeCallsUsed?: number;
+  freeCallsLimit?: number;
+  createdAt?: number;
+};
 
 type AuthState = {
   user: User | null;
@@ -42,9 +49,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       try {
-        const me = await api<{ id: string; email: string; createdAt: number }>("/api/users/me");
+        const me = await api<{
+          id: string;
+          email: string;
+          role: "user" | "admin";
+          freeCallsUsed: number;
+          freeCallsLimit: number;
+          createdAt: number;
+        }>("/api/users/me");
         if (!cancelled) {
-          setUser({ id: me.id, email: me.email, createdAt: me.createdAt });
+          setUser({
+            id: me.id,
+            email: me.email,
+            role: me.role,
+            freeCallsUsed: me.freeCallsUsed,
+            freeCallsLimit: me.freeCallsLimit,
+            createdAt: me.createdAt,
+          });
           setToken(t);
         }
       } catch {
@@ -59,7 +80,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logout]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await api<{ token: string; user: { id: string; email: string } }>("/api/auth/login", {
+    const res = await api<{
+      token: string;
+      user: {
+        id: string;
+        email: string;
+        role: "user" | "admin";
+        freeCallsUsed: number;
+        freeCallsLimit: number;
+      };
+    }>("/api/auth/login", {
       method: "POST",
       body: { email, password },
     });
@@ -69,7 +99,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (email: string, password: string) => {
-    const res = await api<{ token: string; user: { id: string; email: string } }>("/api/auth/register", {
+    const res = await api<{
+      token: string;
+      user: {
+        id: string;
+        email: string;
+        role: "user" | "admin";
+        freeCallsUsed: number;
+        freeCallsLimit: number;
+      };
+    }>("/api/auth/register", {
       method: "POST",
       body: { email, password },
     });
