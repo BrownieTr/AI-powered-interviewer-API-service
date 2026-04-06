@@ -95,6 +95,16 @@ export function InterviewRoomPage() {
     }
   }
 
+  useEffect(() => {
+    if (!sessionId || !session || session.status === "completed") return;
+    const timer = setInterval(() => {
+      void load().catch(() => {
+        // Keep silent polling failures from interrupting the live transcript view.
+      });
+    }, LIVE_POLL_MS);
+    return () => clearInterval(timer);
+  }, [sessionId, session, load]);
+
   if (error && !session) {
     return (
       <p className="page-error">
@@ -108,16 +118,6 @@ export function InterviewRoomPage() {
   }
 
   const active = session.status === "active";
-
-  useEffect(() => {
-    if (!sessionId || !session || session.status === "completed") return;
-    const timer = setInterval(() => {
-      void load().catch(() => {
-        // Keep silent polling failures from interrupting the live transcript view.
-      });
-    }, LIVE_POLL_MS);
-    return () => clearInterval(timer);
-  }, [sessionId, session, load]);
 
   return (
     <div className="room">
