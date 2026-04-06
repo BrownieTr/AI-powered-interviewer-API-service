@@ -70,7 +70,12 @@ let cached: Config | null = null;
 
 export function loadConfig(): Config {
   if (cached) return cached;
-  const parsed = envSchema.safeParse(process.env);
+  const normalizedEnv = {
+    ...process.env,
+    CLIENT_ORIGIN:
+      process.env.CLIENT_ORIGIN ?? process.env["CLIENT-ORIGIN"] ?? process.env.client_origin,
+  };
+  const parsed = envSchema.safeParse(normalizedEnv);
   if (!parsed.success) {
     const msg = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
     throw new Error(`Invalid environment: ${msg}`);

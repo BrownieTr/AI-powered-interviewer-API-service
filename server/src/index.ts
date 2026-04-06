@@ -16,6 +16,13 @@ const hf = createInferenceClient(config);
 
 const app = express();
 const PORT = Number(process.env.PORT) || config.PORT || 3001;
+const corsOrigin = config.CLIENT_ORIGIN ?? (config.NODE_ENV === "production" ? undefined : "http://localhost:5173");
+
+if (config.NODE_ENV === "production" && !corsOrigin) {
+  throw new Error(
+    "CLIENT_ORIGIN is required in production. Set CLIENT_ORIGIN (or CLIENT-ORIGIN) to your deployed frontend URL."
+  );
+}
 
 app.set("trust proxy", 1);
 
@@ -28,7 +35,7 @@ app.use(
 
 app.use(
   cors({
-    origin: config.CLIENT_ORIGIN ?? process.env.CLIENT_ORIGIN ?? "http://localhost:5173",
+    origin: corsOrigin,
     credentials: true,
   })
 );
