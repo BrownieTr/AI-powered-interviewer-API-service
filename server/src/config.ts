@@ -73,7 +73,7 @@ export function loadConfig(): Config {
   const normalizedEnv = {
     ...process.env,
     CLIENT_ORIGIN:
-      process.env.CLIENT_ORIGIN ?? process.env["CLIENT-ORIGIN"] ?? process.env.client_origin,
+      process.env.CLIENT_ORIGIN ?? process.env["CLIENT_ORIGIN"] ?? process.env.client_origin,
   };
   const parsed = envSchema.safeParse(normalizedEnv);
   if (!parsed.success) {
