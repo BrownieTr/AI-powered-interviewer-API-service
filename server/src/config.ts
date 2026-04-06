@@ -85,7 +85,9 @@ export function loadConfig(): Config {
     parsed.data.CLIENT_ORIGIN &&
     /^https?:\/\/localhost(?::\d+)?$/i.test(parsed.data.CLIENT_ORIGIN)
   ) {
-    throw new Error("Invalid environment: CLIENT_ORIGIN cannot be localhost in production.");
+    throw new Error(
+      `Invalid environment: CLIENT_ORIGIN cannot be localhost in production (received: ${parsed.data.CLIENT_ORIGIN}).`
+    );
   }
   cached = parsed.data;
   return parsed.data;
